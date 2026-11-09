@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de prospecção de sites</title>
+<style>
+/* ===== 1. CORES E BASE ===== */
+:root{--bg:#12171a;--sf:#1b2226;--sf2:#243036;--bd:#2f3b41;--tx:#e6eeea;--mu:#93a39d;--ac:#3ddc97;--ac-t:#0c2a1d;--rd:#ff6b6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+h1,h2,h3{margin:0 0 .5rem;line-height:1.2}
+h2{font-size:1.25rem}
+.mu{color:var(--mu);font-size:.875rem}
+a{color:var(--ac)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* ===== 2. CABEÇALHO (com o medidor do dia) ===== */
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--bd);padding:12px 16px 0}
+.topo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+h1{font-size:1.15rem;margin:0}
+.medidor{min-width:220px}
+.medidor b{font-size:1.6rem;color:var(--ac)}
+.medidor.estourou b{color:var(--rd)}
+.barra{height:8px;background:var(--sf2);border-radius:99px;overflow:hidden;margin-top:4px}
+.barra i{display:block;height:100%;background:var(--ac);width:0}
+.medidor.estourou .barra i{background:var(--rd)}
+nav{display:flex;gap:4px;overflow-x:auto;margin-top:10px}
+nav button{background:none;border:0;border-bottom:3px solid transparent;color:var(--mu);padding:8px 12px;font:inherit;cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--tx);border-color:var(--ac)}
+
+/* ===== 3. ÁREA PRINCIPAL ===== */
+main{max-width:1200px;margin:0 auto;padding:16px}
+section{display:none}
+section.on{display:block}
+.box{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label{display:block;font-size:.875rem;color:var(--mu)}
+input,select,textarea{width:100%;margin-top:4px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:9px 10px;font:inherit}
+textarea{min-height:120px;resize:vertical}
+.btn{background:var(--sf2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+.btn:hover{border-color:var(--ac)}
+.btn.pri{background:var(--ac);color:var(--ac-t);border-color:var(--ac);font-weight:600}
+.btn.perigo{color:var(--rd)}
+.linha{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:12px}
+.dica{border-left:3px solid var(--ac);padding:6px 12px;margin-top:12px;color:var(--mu)}
+
+/* ===== 4. FUNIL (kanban) ===== */
+.quadro{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:8px}
+.col{flex:0 0 255px;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:10px}
+.col h3{font-size:.95rem;display:flex;justify-content:space-between}
+.card{background:var(--sf2);border-radius:8px;padding:10px;margin-top:8px;border:1px solid transparent}
+.card.atrasado{border-color:var(--rd)}
+.card b{display:block}
+.card .acoes{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.card .acoes .btn{padding:4px 9px;font-size:.8rem}
+.card input[type=date]{padding:4px 6px;font-size:.8rem}
+.atraso-txt{color:var(--rd);font-size:.8rem}
+
+/* ===== 5. PACOTES, RESULTADOS ===== */
+.pacote{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end}
+@media(max-width:640px){.pacote{grid-template-columns:1fr 1fr}}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.num{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:14px}
+.num b{display:block;font-size:1.8rem}
+
+/* ===== 6. JANELA DE MENSAGEM E AVISOS ===== */
+dialog{background:var(--sf);color:var(--tx);border:1px solid var(--bd);border-radius:14px;width:min(640px,94vw);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.65)}
+#aviso{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ac);color:var(--ac-t);padding:10px 16px;border-radius:8px;font-weight:600;display:none;z-index:20;max-width:92vw}
+#aviso.erro{background:var(--rd);color:#2b0a0a}
+.lembrete{background:var(--sf);border:1px solid var(--ac);border-radius:12px;padding:12px 16px;margin-bottom:16px}
+.lembrete .item{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+.sync{font-size:.8rem;color:var(--mu)}
+#login{position:fixed;inset:0;background:var(--bg);z-index:30;display:none;align-items:center;justify-content:center;padding:16px}
+#login form{width:min(380px,100%);margin:0}
+.grafico{width:100%;height:auto}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="topo">
+    <div><h1>Painel de prospecção</h1><span class="sync" id="sync"></span></div>
+    <div class="medidor" id="medidor">
+      Hoje: <b id="m-n">0</b> de <span id="m-meta">10</span> abordagens
+      <div class="barra"><i id="m-barra"></i></div>
+      <div class="mu" id="m-txt"></div>
+    </div>
+  </div>
+  <nav id="abas">
+    <button data-aba="buscar" class="on">Buscar e cadastrar</button>
+    <button data-aba="funil">Funil</button>
+    <button data-aba="pacotes">Pacotes e preços</button>
+    <button data-aba="resultados">Resultados</button>
+    <button data-aba="config">Configurações</button>
+  </nav>
+</header>
+
+<main>
+<div class="lembrete" id="lembretes" hidden></div>
+
+<!-- ===== ABA: BUSCAR E CADASTRAR ===== -->
+<section id="aba-buscar" class="on">
+  <div class="box">
+    <h2>Buscar empresas</h2>
+    <div class="grid">
+      <label>Nicho<input id="b-nicho" placeholder="salão, barbearia, advogado..."></label>
+      <label>Cidade ou bairro<input id="b-cidade" placeholder="Santo André"></label>
+    </div>
+    <div class="linha"><button class="btn pri" id="b-abrir">Pesquisar no Google Maps</button></div>
+    <div class="dica">Procure empresas com boas avaliações e SEM site no perfil; copie nome, telefone e Instagram para o cadastro abaixo.</div>
+  </div>
+
+  <form class="box" id="form-p">
+    <h2 id="f-titulo">Novo prospect</h2>
+    <div class="grid">
+      <label>Nome da empresa *<input id="p-empresa" required></label>
+      <label>Nicho<input id="p-nicho"></label>
+      <label>Cidade<input id="p-cidade"></label>
+      <label>Telefone / WhatsApp<input id="p-tel" placeholder="(11) 91234-5678" inputmode="tel"></label>
+      <label>Instagram<input id="p-insta" placeholder="@perfil"></label>
+      <label>Link do Google Maps<input id="p-maps" type="url"></label>
+      <label>Tem site?
+        <select id="p-site"><option>Não</option><option>Sim, ruim</option><option>Sim, bom</option></select>
+      </label>
+      <label>Observações<input id="p-obs"></label>
+    </div>
+    <div class="linha">
+      <button class="btn pri" type="submit" id="f-salvar">Salvar prospect</button>
+      <button class="btn" type="button" id="f-cancelar" hidden>Cancelar edição</button>
+    </div>
+  </form>
+
+  <div class="box">
+    <h2>Importar e exportar</h2>
+    <p class="mu">Arquivo CSV com as colunas: empresa, nicho, cidade, tel, insta, maps, site, obs, status, follow, valor.</p>
+    <div class="linha">
+      <button class="btn" id="csv-exp">Exportar CSV</button>
+      <label class="btn" style="margin:0">Importar CSV<input id="csv-imp" type="file" accept=".csv,text/csv" hidden></label>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ABA: FUNIL ===== -->
+<section id="aba-funil">
+  <div class="quadro" id="quadro"></div>
+</section>
+
+<!-- ===== ABA: PACOTES ===== -->
+<section id="aba-pacotes">
+  <div class="box">
+    <h2>Pacotes e preços</h2>
+    <p class="mu">Estes pacotes aparecem na janela de mensagem como "Proposta".</p>
+    <div id="lista-pacotes"></div>
+    <div class="linha"><button class="btn" id="pac-novo">Adicionar pacote</button></div>
+  </div>
+</section>
+
+<!-- ===== ABA: RESULTADOS ===== -->
+<section id="aba-resultados">
+  <div class="nums" id="nums"></div>
+  <div class="box" style="margin-top:16px"><h2>Abordagens por semana</h2><div id="grafico"></div><p class="mu">Últimas 8 semanas (semana começa na segunda). Barra mais alta = mais abordagens feitas.</p></div>
+</section>
+
+<!-- ===== ABA: CONFIGURAÇÕES ===== -->
+<section id="aba-config">
+  <div class="box">
+    <h2>Seus dados</h2>
+    <div class="grid">
+      <label>Seu nome<input id="c-nome"></label>
+      <label>Seu WhatsApp<input id="c-whats" inputmode="tel"></label>
+      <label>Link do seu site de exemplo<input id="c-port" type="url"></label>
+      <label>Meta de abordagens por dia<input id="c-meta" type="number" min="1"></label>
+    </div>
+  </div>
+  <div class="box">
+    <h2>Modelos de mensagem</h2>
+    <p class="mu">Variáveis: {empresa} {nicho} {cidade} {meuNome} {meuWhats} {linkExemplo}. Na proposta também: {pacote} {preco} {prazo}. Ajuste os textos para que sejam verdadeiros e com a sua voz.</p>
+    <label>Instagram<textarea id="t-insta"></textarea></label>
+    <label>WhatsApp direto<textarea id="t-whats"></textarea></label>
+    <label>Follow-up (3 dias sem resposta)<textarea id="t-follow"></textarea></label>
+    <label>Proposta<textarea id="t-proposta"></textarea></label>
+  </div>
+  <div class="box">
+    <h2>Dados</h2>
+    <p class="mu">Tudo fica salvo só neste navegador. Exporte o CSV de vez em quando como backup.</p>
+    <button class="btn" id="sair" hidden>Sair da conta</button> <button class="btn perigo" id="apagar">Apagar todos os dados</button>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== JANELA DE MENSAGEM ===== -->
+<dialog id="dlg">
+  <h2 id="d-titulo">Mensagem</h2>
+  <label>Tipo de mensagem<select id="d-tipo"></select></label>
+  <label>Texto (pode editar antes de enviar)<textarea id="d-texto" style="min-height:220px"></textarea></label>
+  <div class="linha">
+    <button class="btn" id="d-copiar">Copiar mensagem</button>
+    <button class="btn pri" id="d-whats">Abrir no WhatsApp</button>
+    <button class="btn" id="d-insta">Abrir Instagram</button>
+    <button class="btn" id="d-fechar">Fechar</button>
+  </div>
+  <p class="mu">O painel só prepara a mensagem: quem envia é você, uma por uma.</p>
+</dialog>
+
+<div id="login"><form id="form-login" class="box"><h2>Entrar no painel</h2>
+  <label>E-mail<input id="l-email" type="email" required autocomplete="username"></label>
+  <label style="margin-top:10px">Senha<input id="l-senha" type="password" required autocomplete="current-password"></label>
+  <div class="linha"><button class="btn pri" type="submit">Entrar</button></div></form></div>
+
+<dialog id="dsite">
+  <h2 id="s-titulo">Prévia do site</h2>
+  <label>Modelo de nicho<select id="s-nicho"></select></label>
+  <label style="margin-top:10px">Frase principal<input id="s-slogan"></label>
+  <label style="margin-top:10px">Serviços (um por linha)<textarea id="s-srv" style="min-height:110px"></textarea></label>
+  <div class="linha"><button class="btn pri" id="s-ver">Ver prévia</button><button class="btn" id="s-baixar">Baixar HTML</button><button class="btn" id="s-fechar">Fechar</button></div>
+  <p class="mu">Os textos são exemplos: edite para que sejam verdadeiros para essa empresa. Para enviar ao cliente, baixe o arquivo e publique (Vercel, Netlify) ou mostre em tela.</p>
+</dialog>
+
+<div id="aviso" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ===== 1. DADOS E ARMAZENAMENTO ===== */
+// Preencha para ativar a nuvem (Supabase). Deixe vazio para usar só neste navegador.
+const SUPABASE_URL = '';
+const SUPABASE_KEY = '';   // chave "anon / publishable". NUNCA use a service_role aqui.
+const CHAVE = 'painel-prospeccao-v1';
+const ETAPAS = ['Novo','Abordado','Respondeu','Proposta enviada','Fechado','Perdido'];
+
+function padrao(){
+  return {
+    cfg:{ nome:'', whats:'', portfolio:'', meta:10, tpl:{
+      insta:'Oi, tudo bem? Vi o trabalho da {empresa} no Instagram, muito bom! Posso te fazer uma pergunta rápida?\n\nProcurei a {empresa} no Google e vi que vocês ainda não têm um site. Montei um para um negócio parecido: {linkExemplo}\n\nSe quiser, monto uma ideia de como ficaria o de vocês, sem compromisso. Faz sentido pra você?\n\n{meuNome}',
+      whats:'Olá! Tudo bem? Aqui é {meuNome}. Encontrei a {empresa} aqui em {cidade} e vi que vocês ainda não têm site.\n\nCrio sites simples e rápidos que levam o cliente direto para o WhatsApp. Exemplo: {linkExemplo}\n\nPosso montar uma prévia para a {empresa}, sem compromisso. Quer ver?',
+      follow:'Oi! {meuNome} aqui de novo. Passando só para saber se você chegou a ver minha mensagem sobre o site da {empresa}. Se não for o momento, sem problema! Posso te mostrar a prévia rapidinho?',
+      proposta:'Olá! Segue a proposta para a {empresa}:\n\nPacote: {pacote}\nValor: R$ {preco}\nPrazo de entrega: {prazo}\n\nSe estiver de acordo, começo assim que você aprovar. Qualquer dúvida, é só falar!\n\n{meuNome}'
+    }},
+    pacotes:[
+      {id:'a1',nome:'Site Básico',preco:500,prazo:'5 dias'},
+      {id:'a2',nome:'Site + Agendamento',preco:900,prazo:'10 dias'},
+      {id:'a3',nome:'Site + Loja',preco:1500,prazo:'15 dias'}
+    ],
+    prospects:[],
+    log:[]   // datas (AAAA-MM-DD) de cada abordagem feita
+  };
+}
+
+function carregar(){
+  const p = padrao();
+  try{
+    const r = localStorage.getItem(CHAVE);
+    if(r){
+      const d = JSON.parse(r);
+      return {...p, ...d, cfg:{...p.cfg, ...d.cfg, tpl:{...p.cfg.tpl, ...((d.cfg||{}).tpl)}}};
+    }
+  }catch(e){ console.error(e); }
+  return p;
+}
+function salvar(){
+  S.v = Date.now();   // marca a versão, para saber qual aparelho tem o dado mais novo
+  try{ localStorage.setItem(CHAVE, JSON.stringify(S)); }
+  catch(e){ aviso('Não foi possível salvar neste navegador.', true); }
+  agendarNuvem(); desenharLembretes();
+}
+let S = carregar();
+let editId = null;
+
+/* ===== 2. FUNÇÕES AUXILIARES ===== */
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const pad = n => String(n).padStart(2,'0');
+function dataISO(d = new Date()){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function maisDias(n){ const d = new Date(); d.setDate(d.getDate()+n); return dataISO(d); }
+function dataBR(iso){ return iso ? iso.split('-').reverse().slice(0,2).join('/') : '—'; }
+function dinheiro(v){ return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function numero(v){ return parseFloat(String(v).replace(',','.')) || 0; }
+
+let tAviso;
+function aviso(msg, erro){
+  const a = $('aviso'); a.textContent = msg; a.className = erro ? 'erro' : ''; a.style.display = 'block';
+  clearTimeout(tAviso); tAviso = setTimeout(()=>a.style.display='none', 3500);
+}
+
+// Telefone no padrão do WhatsApp: 55 + DDD + número (só dígitos). Vazio = inválido.
+function fone(v){
+  const d = (v||'').replace(/\D/g,'');
+  if(d.startsWith('55') && (d.length===12 || d.length===13)) return d;
+  if(d.length===10 || d.length===11) return '55'+d;
+  return '';
+}
+function foneBonito(d){
+  if(!d) return 'sem telefone';
+  const n = d.slice(2);
+  return '('+n.slice(0,2)+') '+(n.length===11 ? n.slice(2,7)+'-'+n.slice(7) : n.slice(2,6)+'-'+n.slice(6));
+}
+
+/* ===== 3. ABAS ===== */
+function mostrarAba(nome){
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id==='aba-'+nome));
+  document.querySelectorAll('#abas button').forEach(b => b.classList.toggle('on', b.dataset.aba===nome));
+  if(nome==='funil') desenharFunil();
+  if(nome==='pacotes') desenharPacotes();
+  if(nome==='resultados') desenharResultados();
+  if(nome==='config') preencherConfig();
+}
+$('abas').addEventListener('click', e => { const b = e.target.closest('button'); if(b) mostrarAba(b.dataset.aba); });
+
+/* ===== 4. MEDIDOR DE ABORDAGENS DO DIA ===== */
+function desenharMedidor(){
+  const n = S.log.filter(d => d===dataISO()).length;
+  const meta = S.cfg.meta || 10;
+  $('m-n').textContent = n;
+  $('m-meta').textContent = meta;
+  $('m-barra').style.width = Math.min(100, n/meta*100)+'%';
+  $('medidor').classList.toggle('estourou', n>meta);
+  $('m-txt').textContent = n>meta ? 'Passou da meta. Poucas abordagens bem personalizadas funcionam melhor e evitam bloqueio.' : '';
+}
+
+/* ===== 5. BUSCA E CADASTRO ===== */
+$('b-abrir').onclick = () => {
+  const q = ($('b-nicho').value+' '+$('b-cidade').value).trim();
+  if(!q){ aviso('Digite um nicho e uma cidade.', true); return; }
+  window.open('https://www.google.com/maps/search/'+encodeURIComponent(q).replace(/%20/g,'+'), '_blank', 'noopener');
+};
+
+const CAMPOS = {empresa:'p-empresa',nicho:'p-nicho',cidade:'p-cidade',tel:'p-tel',insta:'p-insta',maps:'p-maps',site:'p-site',obs:'p-obs'};
+
+function limparForm(){
+  $('form-p').reset(); editId = null;
+  $('f-titulo').textContent = 'Novo prospect';
+  $('f-salvar').textContent = 'Salvar prospect';
+  $('f-cancelar').hidden = true;
+}
+$('f-cancelar').onclick = limparForm;
+
+$('form-p').addEventListener('submit', e => {
+  e.preventDefault();
+  const d = {};
+  for(const k in CAMPOS) d[k] = $(CAMPOS[k]).value.trim();
+  const bruto = d.tel;
+  d.tel = fone(bruto);
+  if(bruto && !d.tel){ aviso('Telefone inválido. Use DDD + número, ex.: (11) 91234-5678.', true); return; }
+  if(editId){
+    Object.assign(S.prospects.find(p => p.id===editId), d);
+    aviso('Prospect atualizado.');
+  }else{
+    S.prospects.push({id:novoId(), status:'Novo', ultima:'', follow:'', valor:0, abordado:false, ...d});
+    aviso('Prospect salvo no funil.');
+  }
+  salvar(); limparForm();
+});
+
+function editar(id){
+  const p = S.prospects.find(x => x.id===id); if(!p) return;
+  for(const k in CAMPOS) $(CAMPOS[k]).value = p[k] || '';
+  editId = id;
+  $('f-titulo').textContent = 'Editar prospect';
+  $('f-salvar').textContent = 'Salvar alterações';
+  $('f-cancelar').hidden = false;
+  mostrarAba('buscar'); window.scrollTo(0, 0);
+}
+
+/* ===== 6. FUNIL ===== */
+function desenharFunil(){
+  const hoje = dataISO();
+  $('quadro').innerHTML = ETAPAS.map((et, i) => {
+    const lista = S.prospects.filter(p => p.status===et);
+    const cards = lista.map(p => {
+      const atrasado = p.follow && p.follow < hoje && p.status!=='Fechado' && p.status!=='Perdido';
+      return `<div class="card ${atrasado?'atrasado':''}" data-id="${p.id}">
+        <b>${esc(p.empresa)}</b>
+        <div class="mu">${esc(p.nicho||'sem nicho')} · ${esc(p.cidade||'sem cidade')}</div>
+        <div class="mu">${foneBonito(p.tel)}</div>
+        <div class="mu">Última ação: ${dataBR(p.ultima)}</div>
+        ${p.status==='Fechado' ? `<div class="mu">Venda: R$ ${dinheiro(p.valor)}</div>` : ''}
+        <label>Próximo follow-up<input type="date" data-f="${p.id}" value="${esc(p.follow)}"></label>
+        ${atrasado ? '<div class="atraso-txt">Follow-up atrasado</div>' : ''}
+        <div class="acoes">
+          <button class="btn" data-a="volta" ${i===0?'disabled':''} title="Etapa anterior">‹</button>
+          <button class="btn pri" data-a="msg">Mensagem</button>
+          <button class="btn" data-a="avanca" ${i===ETAPAS.length-1?'disabled':''} title="Próxima etapa">›</button>
+          <button class="btn" data-a="site">Prévia do site</button>
+          <button class="btn" data-a="edita">Editar</button>
+          <button class="btn perigo" data-a="apaga">Excluir</button>
+        </div></div>`;
+    }).join('') || '<p class="mu">Nenhum prospect aqui.</p>';
+    return `<div class="col"><h3>${et}<span class="mu">${lista.length}</span></h3>${cards}</div>`;
+  }).join('');
+}
+
+function mover(p, passo){
+  const novo = ETAPAS[ETAPAS.indexOf(p.status)+passo];
+  if(!novo) return;
+  if(novo==='Fechado'){
+    const v = prompt('Valor da venda em R$:', S.pacotes[0] ? S.pacotes[0].preco : '');
+    if(v===null) return;
+    p.valor = numero(v);
+  }
+  p.status = novo;
+  if(novo!=='Novo' && novo!=='Perdido') p.abordado = true;
+  p.ultima = dataISO();
+}
+
+$('quadro').addEventListener('click', e => {
+  const b = e.target.closest('button[data-a]'); if(!b) return;
+  const id = b.closest('.card').dataset.id;
+  const p = S.prospects.find(x => x.id===id); if(!p) return;
+  const a = b.dataset.a;
+  if(a==='msg'){ abrirMensagem(id); return; }
+  if(a==='edita'){ editar(id); return; }
+  if(a==='site'){ abrirSite(id); return; }
+  if(a==='apaga'){
+    if(confirm('Excluir "'+p.empresa+'"?')) S.prospects = S.prospects.filter(x => x.id!==id);
+    else return;
+  }
+  if(a==='avanca') mover(p, 1);
+  if(a==='volta') mover(p, -1);
+  salvar(); desenharFunil();
+});
+$('quadro').addEventListener('change', e => {
+  const i = e.target.closest('input[data-f]'); if(!i) return;
+  S.prospects.find(x => x.id===i.dataset.f).follow = i.value;
+  salvar(); desenharFunil();
+});
+
+/* ===== 7. MENSAGENS ===== */
+let atual = null; // prospect aberto na janela
+
+function montar(p, tipo){
+  const c = S.cfg;
+  const v = {empresa:p.empresa, nicho:p.nicho||'seu ramo', cidade:p.cidade||'sua cidade',
+             meuNome:c.nome||'[seu nome]', meuWhats:c.whats||'', linkExemplo:c.portfolio||'[link do seu site de exemplo]'};
+  let modelo;
+  if(tipo.startsWith('pac:')){
+    const k = S.pacotes.find(x => x.id===tipo.slice(4)) || {nome:'',preco:0,prazo:''};
+    modelo = c.tpl.proposta;
+    Object.assign(v, {pacote:k.nome, preco:dinheiro(k.preco), prazo:k.prazo});
+  }else modelo = c.tpl[tipo];
+  return modelo.replace(/\{(\w+)\}/g, (m, k) => v[k] ?? m);
+}
+
+function abrirMensagem(id){
+  atual = S.prospects.find(x => x.id===id); if(!atual) return;
+  $('d-titulo').textContent = 'Mensagem para '+atual.empresa;
+  const ops = [['insta','Abordagem: Instagram'],['whats','Abordagem: WhatsApp direto'],['follow','Follow-up']]
+    .concat(S.pacotes.map(k => ['pac:'+k.id, 'Proposta: '+k.nome]));
+  $('d-tipo').innerHTML = ops.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('');
+  // sugestão de tipo conforme a etapa
+  $('d-tipo').value = atual.abordado ? 'follow' : (atual.tel && !atual.insta ? 'whats' : 'insta');
+  if(atual.status==='Respondeu' && S.pacotes[0]) $('d-tipo').value = 'pac:'+S.pacotes[0].id;
+  $('d-texto').value = montar(atual, $('d-tipo').value);
+  $('d-insta').hidden = !atual.insta;
+  $('dlg').showModal();
+}
+$('d-tipo').onchange = () => { $('d-texto').value = montar(atual, $('d-tipo').value); };
+$('d-fechar').onclick = () => $('dlg').close();
+
+$('d-copiar').onclick = async () => {
+  try{ await navigator.clipboard.writeText($('d-texto').value); aviso('Mensagem copiada.'); }
+  catch(e){ $('d-texto').select(); aviso('Selecione e copie com Ctrl+C.', true); }
+};
+
+// Registra a abordagem: contador do dia, etapa e follow-up
+function registrar(tipo){
+  S.log.push(dataISO());
+  atual.ultima = dataISO();
+  atual.abordado = true;
+  if(tipo.startsWith('pac:')) atual.status = 'Proposta enviada';
+  else if(atual.status==='Novo') atual.status = 'Abordado';
+  if(!atual.follow || atual.follow < dataISO()) atual.follow = maisDias(3);
+  salvar(); desenharMedidor();
+  const n = S.log.filter(d => d===dataISO()).length;
+  if(n > (S.cfg.meta||10)) aviso('Passou da meta de hoje. Poucas abordagens bem personalizadas funcionam melhor e evitam bloqueio.', true);
+}
+
+$('d-whats').onclick = () => {
+  if(!atual.tel){ aviso('Este prospect não tem telefone válido. Edite o cadastro.', true); return; }
+  const tipo = $('d-tipo').value;
+  window.open('https://wa.me/'+atual.tel+'?text='+encodeURIComponent($('d-texto').value), '_blank', 'noopener');
+  registrar(tipo);
+  $('dlg').close(); desenharFunil();
+};
+$('d-insta').onclick = () => {
+  const u = atual.insta.replace(/^@/,'').replace(/^https?:\/\/(www\.)?instagram\.com\//,'').replace(/\/.*$/,'');
+  window.open('https://www.instagram.com/'+encodeURIComponent(u), '_blank', 'noopener');
+  aviso('Copie a mensagem, envie no Instagram e depois use "Copiar" para registrar.');
+};
+// No Instagram não dá para abrir com texto pronto: ao copiar, registramos a abordagem
+$('d-copiar').addEventListener('click', () => {
+  if(atual && atual.insta && $('d-tipo').value!=='whats' && atual.status==='Novo'){ registrar($('d-tipo').value); desenharFunil(); }
+});
+
+/* ===== 8. PACOTES ===== */
+function desenharPacotes(){
+  $('lista-pacotes').innerHTML = S.pacotes.map(k => `
+    <div class="pacote">
+      <label>Nome<input data-p="${k.id}" data-k="nome" value="${esc(k.nome)}"></label>
+      <label>Preço (R$)<input data-p="${k.id}" data-k="preco" type="number" min="0" step="10" value="${k.preco}"></label>
+      <label>Prazo<input data-p="${k.id}" data-k="prazo" value="${esc(k.prazo)}"></label>
+      <button class="btn perigo" data-rm="${k.id}">Remover</button>
+    </div>`).join('') || '<p class="mu">Nenhum pacote. Adicione o primeiro.</p>';
+}
+$('lista-pacotes').addEventListener('change', e => {
+  const i = e.target.closest('input[data-p]'); if(!i) return;
+  const k = S.pacotes.find(x => x.id===i.dataset.p);
+  k[i.dataset.k] = i.dataset.k==='preco' ? numero(i.value) : i.value;
+  salvar();
+});
+$('lista-pacotes').addEventListener('click', e => {
+  const b = e.target.closest('button[data-rm]'); if(!b) return;
+  S.pacotes = S.pacotes.filter(x => x.id!==b.dataset.rm); salvar(); desenharPacotes();
+});
+$('pac-novo').onclick = () => { S.pacotes.push({id:novoId(), nome:'Novo pacote', preco:0, prazo:''}); salvar(); desenharPacotes(); };
+
+/* ===== 9. RESULTADOS ===== */
+function desenharResultados(){
+  const P = S.prospects;
+  const abord = P.filter(p => p.abordado || (p.status!=='Novo' && p.status!=='Perdido')).length;
+  const resp = P.filter(p => ['Respondeu','Proposta enviada','Fechado'].includes(p.status)).length;
+  const prop = P.filter(p => ['Proposta enviada','Fechado'].includes(p.status)).length;
+  const fech = P.filter(p => p.status==='Fechado');
+  const total = fech.reduce((s,p) => s+(p.valor||0), 0);
+  const pct = (a,b) => b ? Math.round(a/b*100)+'%' : '—';
+  const itens = [['Prospects',P.length],['Abordados',abord],['Respostas',resp],['Propostas',prop],['Fechados',fech.length],
+    ['Taxa de resposta',pct(resp,abord)],['Taxa de fechamento',pct(fech.length,abord)],['Total vendido','R$ '+dinheiro(total)]];
+  $('nums').innerHTML = itens.map(i => `<div class="num"><span class="mu">${i[0]}</span><b>${i[1]}</b></div>`).join('');
+  desenharGrafico();
+}
+
+/* ===== 10. CONFIGURAÇÕES ===== */
+const TPLS = ['insta','whats','follow','proposta'];
+function preencherConfig(){
+  const c = S.cfg;
+  $('c-nome').value = c.nome; $('c-whats').value = c.whats; $('c-port').value = c.portfolio; $('c-meta').value = c.meta;
+  TPLS.forEach(t => $('t-'+t).value = c.tpl[t]);
+}
+$('aba-config').addEventListener('change', () => {
+  const c = S.cfg;
+  c.nome = $('c-nome').value.trim(); c.whats = $('c-whats').value.trim(); c.portfolio = $('c-port').value.trim();
+  c.meta = Math.max(1, parseInt($('c-meta').value) || 10);
+  TPLS.forEach(t => c.tpl[t] = $('t-'+t).value);
+  salvar(); desenharMedidor();
+});
+$('apagar').onclick = () => {
+  if(!confirm('Apagar TODOS os prospects, pacotes e configurações? Não dá para desfazer.')) return;
+  try{ localStorage.removeItem(CHAVE); }catch(e){}
+  S = padrao(); salvar(); limparForm(); desenharMedidor(); preencherConfig(); aviso('Dados apagados.');
+};
+
+/* ===== 11. CSV ===== */
+const COLS = ['empresa','nicho','cidade','tel','insta','maps','site','obs','status','follow','valor'];
+const celula = v => '"'+String(v ?? '').replace(/"/g,'""')+'"';
+
+$('csv-exp').onclick = () => {
+  const linhas = [COLS.join(',')].concat(S.prospects.map(p => COLS.map(c => celula(p[c])).join(',')));
+  const blob = new Blob(['\ufeff'+linhas.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'prospects-'+dataISO()+'.csv'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+function lerCSV(t){
+  const rows = []; let r = [], c = '', q = false;
+  for(let i=0; i<t.length; i++){
+    const ch = t[i];
+    if(q){ if(ch==='"'){ if(t[i+1]==='"'){ c+='"'; i++; } else q = false; } else c += ch; }
+    else if(ch==='"') q = true;
+    else if(ch===','){ r.push(c); c = ''; }
+    else if(ch==='\n' || ch==='\r'){ if(ch==='\r' && t[i+1]==='\n') i++; r.push(c); c = ''; rows.push(r); r = []; }
+    else c += ch;
+  }
+  if(c || r.length){ r.push(c); rows.push(r); }
+  return rows;
+}
+
+$('csv-imp').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  const leitor = new FileReader();
+  leitor.onload = () => {
+    try{
+      const rows = lerCSV(String(leitor.result).replace(/^\ufeff/,'')).filter(r => r.some(x => x.trim()));
+      const cab = rows.shift().map(x => x.trim().toLowerCase());
+      let n = 0;
+      rows.forEach(r => {
+        const o = {}; cab.forEach((k,i) => o[k] = (r[i]||'').trim());
+        if(!o.empresa) return;
+        S.prospects.push({id:novoId(), empresa:o.empresa, nicho:o.nicho||'', cidade:o.cidade||'', tel:fone(o.tel), insta:o.insta||'',
+          maps:o.maps||'', site:o.site||'Não', obs:o.obs||'', status:ETAPAS.includes(o.status)?o.status:'Novo',
+          follow:o.follow||'', valor:numero(o.valor), ultima:'', abordado:false});
+        n++;
+      });
+      salvar(); aviso(n+' prospects importados.');
+    }catch(err){ aviso('Não consegui ler esse arquivo CSV.', true); }
+    e.target.value = '';
+  };
+  leitor.readAsText(f);
+});
+
+/* ===== 12. LEMBRETES DE FOLLOW-UP ===== */
+function desenharLembretes(){
+  const hoje = dataISO();
+  const L = S.prospects.filter(p => p.follow && p.follow <= hoje && p.status!=='Fechado' && p.status!=='Perdido')
+    .sort((a,b) => a.follow.localeCompare(b.follow));
+  const el = $('lembretes');
+  el.hidden = !L.length;
+  document.title = (L.length ? '('+L.length+') ' : '')+'Painel de prospecção de sites';
+  el.innerHTML = L.length ? '<b>Follow-ups para fazer: '+L.length+'</b>' + L.map(p =>
+    `<div class="item"><span>${esc(p.empresa)} <span class="${p.follow<hoje?'atraso-txt':'mu'}">${p.follow<hoje?'atrasado desde '+dataBR(p.follow):'é hoje'}</span></span><button class="btn pri" data-lem="${p.id}">Mensagem</button></div>`).join('') : '';
+}
+$('lembretes').addEventListener('click', e => { const b = e.target.closest('button[data-lem]'); if(b) abrirMensagem(b.dataset.lem); });
+
+/* ===== 13. GRÁFICO DE ABORDAGENS POR SEMANA ===== */
+function desenharGrafico(){
+  const N = 8, W = 640, H = 220, bw = W/N;
+  const seg = new Date(); seg.setHours(0,0,0,0); seg.setDate(seg.getDate() - ((seg.getDay()+6)%7)); // segunda desta semana
+  const sems = [];
+  for(let i=N-1; i>=0; i--){ const d = new Date(seg); d.setDate(d.getDate()-7*i); sems.push(d); }
+  const cont = sems.map(d => { const f = new Date(d); f.setDate(f.getDate()+6); const a = dataISO(d), b = dataISO(f); return S.log.filter(x => x>=a && x<=b).length; });
+  const max = Math.max(5, ...cont);
+  let svg = '';
+  cont.forEach((n,i) => {
+    const h = n/max*(H-60), x = i*bw+10, m = x+(bw-20)/2;
+    svg += `<rect x="${x}" y="${H-30-h}" width="${bw-20}" height="${h}" rx="4" fill="#3ddc97"/>`
+         + `<text x="${m}" y="${H-35-h}" text-anchor="middle" fill="#e6eeea" font-size="13">${n}</text>`
+         + `<text x="${m}" y="${H-10}" text-anchor="middle" fill="#93a39d" font-size="12">${dataBR(dataISO(sems[i]))}</text>`;
+  });
+  $('grafico').innerHTML = `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Abordagens por semana">${svg}</svg>`;
+}
+
+/* ===== 14. NUVEM (SUPABASE) ===== */
+let sb = null, tNuvem = null, pendente = false;
+const estado = t => { $('sync').textContent = t; };
+function mesclar(d){ const p = padrao(); return {...p, ...d, cfg:{...p.cfg, ...d.cfg, tpl:{...p.cfg.tpl, ...((d.cfg||{}).tpl)}}}; }
+
+function agendarNuvem(){
+  if(!sb) return;
+  pendente = true; estado('Salvando...');
+  clearTimeout(tNuvem); tNuvem = setTimeout(enviarNuvem, 800);
+}
+async function enviarNuvem(){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(!session) return;
+    const { error } = await sb.from('painel').upsert({ user_id:session.user.id, dados:S, atualizado:new Date().toISOString() });
+    if(error) throw error;
+    pendente = false; estado('Sincronizado');
+  }catch(e){ console.error(e); estado('Sem conexão: salvo só neste aparelho'); }
+}
+async function buscarNuvem(){
+  if(!sb || pendente) return;
+  try{
+    const { data, error } = await sb.from('painel').select('dados').maybeSingle();
+    if(error) throw error;
+    if(data && data.dados){
+      if((data.dados.v||0) > (S.v||0)){
+        S = mesclar(data.dados);
+        try{ localStorage.setItem(CHAVE, JSON.stringify(S)); }catch(e){}
+        redesenharTudo();
+      }
+      estado('Sincronizado');
+    }else{ await enviarNuvem(); }  // primeira vez: sobe os dados deste aparelho
+  }catch(e){ console.error(e); estado('Sem conexão: salvo só neste aparelho'); }
+}
+function redesenharTudo(){ desenharMedidor(); desenharLembretes(); mostrarAba(document.querySelector('section.on').id.slice(4)); }
+
+async function iniciarNuvem(){
+  if(!SUPABASE_URL || !SUPABASE_KEY){ estado('Modo local (sem nuvem)'); return; }
+  if(typeof supabase === 'undefined'){ estado('Sem internet: usando dados locais'); return; }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  $('sair').hidden = false;
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ estado('Sincronizando...'); await buscarNuvem(); }
+  else $('login').style.display = 'flex';
+}
+$('form-login').addEventListener('submit', async e => {
+  e.preventDefault();
+  const { error } = await sb.auth.signInWithPassword({ email:$('l-email').value.trim(), password:$('l-senha').value });
+  if(error){ aviso('E-mail ou senha incorretos.', true); return; }
+  $('login').style.display = 'none'; $('l-senha').value = ''; estado('Sincronizando...'); await buscarNuvem();
+});
+$('sair').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+document.addEventListener('visibilitychange', () => { if(!document.hidden) buscarNuvem(); });
+
+/* ===== 15. PRÉVIA DO SITE POR NICHO ===== */
+const NICHOS = {
+  beleza:{r:'Salão de beleza', m:/sal[aã]o|beleza|cabel|est[eé]tica|unha|manicure|alisamento/i, cor:'#b8456b', bg:'#fff5f7', tx:'#2d1b22',
+    slogan:'Cuidado e beleza para o seu cabelo', srv:['Corte e escova','Coloração','Tratamentos e alisamentos','Manicure e pedicure']},
+  barbearia:{r:'Barbearia', m:/barbe/i, cor:'#c9923a', bg:'#16181b', tx:'#f1ece4',
+    slogan:'Corte e barba com hora marcada', srv:['Corte masculino','Barba','Corte + barba','Sobrancelha']},
+  advocacia:{r:'Advocacia', m:/advog|jur[ií]d|direito/i, cor:'#1f3a5f', bg:'#f6f7f9', tx:'#14202e',
+    slogan:'Orientação jurídica com clareza e atenção', srv:['Direito de família','Direito do consumidor','Direito trabalhista','Consultoria jurídica']},
+  saude:{r:'Clínica / Odontologia', m:/dent|odonto|cl[ií]nica|sa[uú]de|fisio|psic/i, cor:'#17877a', bg:'#f2faf9', tx:'#10302c',
+    slogan:'Cuidado com a sua saúde, do jeito certo', srv:['Consultas e avaliações','Prevenção e limpeza','Tratamentos','Agendamento pelo WhatsApp']},
+  comida:{r:'Restaurante / Lanchonete', m:/restaur|lanch|pizza|hamb|padaria|doce|bolo|marmit|comida|caf[eé]/i, cor:'#d9531e', bg:'#fff8f1', tx:'#2b1a10',
+    slogan:'Feito com capricho, direto para a sua mesa', srv:['Cardápio do dia','Pedidos pelo WhatsApp','Encomendas','Consulte a entrega']},
+  geral:{r:'Negócio local (geral)', m:/./, cor:'#2563eb', bg:'#f5f8ff', tx:'#101828',
+    slogan:'Atendimento de confiança na sua região', srv:['Nossos serviços','Atendimento personalizado','Orçamento sem compromisso','Fale pelo WhatsApp']}
+};
+const detectarNicho = t => Object.keys(NICHOS).find(k => k!=='geral' && NICHOS[k].m.test(t||'')) || 'geral';
+
+function gerarSite(d){
+  const n = NICHOS[d.k];
+  const wa = d.tel ? 'https://wa.me/'+d.tel+'?text='+encodeURIComponent('Olá! Vi o site da '+d.empresa+' e gostaria de saber mais.') : '#';
+  const ig = d.insta ? 'https://www.instagram.com/'+encodeURIComponent(d.insta.replace(/^@/,'')) : '';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(d.empresa)}</title><style>
+*{box-sizing:border-box}body{margin:0;font:17px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;background:${n.bg};color:${n.tx}}
+.w{max-width:960px;margin:0 auto;padding:0 20px}
+.previa{background:#000;color:#fff;text-align:center;padding:6px;font-size:13px}
+.h{padding:72px 0 48px}h1{font-size:clamp(2rem,6vw,3.4rem);line-height:1.1;margin:0 0 12px}
+.sub{font-size:1.2rem;opacity:.8;max-width:34rem;margin:0}
+.b{display:inline-block;margin-top:24px;background:${n.cor};color:#fff;text-decoration:none;padding:14px 26px;border-radius:999px;font-weight:600}
+h2{font-size:1.5rem;margin:0 0 16px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.c{border:2px solid ${n.cor}44;border-radius:14px;padding:18px;font-weight:600}
+section{padding:36px 0}footer{padding:28px 0 90px;border-top:1px solid ${n.cor}44;font-size:.95rem;opacity:.85}
+.fixo{position:fixed;right:16px;bottom:16px;background:#25d366;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:700;box-shadow:0 4px 14px #0004}
+</style></head><body>
+<div class="previa">Prévia criada para ${esc(d.empresa)}</div>
+<header class="h"><div class="w"><h1>${esc(d.empresa)}</h1><p class="sub">${esc(d.slogan)}</p><a class="b" href="${wa}">Chamar no WhatsApp</a></div></header>
+<section><div class="w"><h2>Serviços</h2><div class="g">${d.servicos.map(x => '<div class="c">'+esc(x)+'</div>').join('')}</div></div></section>
+<section><div class="w"><h2>Fale com a gente</h2><p>${esc(d.empresa)}${d.cidade ? ' · '+esc(d.cidade) : ''}${d.tel ? '<br>WhatsApp: '+esc(foneBonito(d.tel)) : ''}</p><a class="b" href="${wa}">Agendar pelo WhatsApp</a>${ig ? ' <a class="b" style="background:transparent;color:'+n.cor+';border:2px solid '+n.cor+'" href="'+ig+'">Instagram</a>' : ''}</div></section>
+<footer><div class="w">© ${esc(d.empresa)}</div></footer>
+<a class="fixo" href="${wa}">WhatsApp</a></body></html>`;
+}
+
+let alvoSite = null;
+function abrirSite(id){
+  alvoSite = S.prospects.find(x => x.id===id); if(!alvoSite) return;
+  $('s-titulo').textContent = 'Prévia do site: '+alvoSite.empresa;
+  $('s-nicho').innerHTML = Object.keys(NICHOS).map(k => `<option value="${k}">${NICHOS[k].r}</option>`).join('');
+  $('s-nicho').value = detectarNicho(alvoSite.nicho);
+  aplicarNicho(); $('dsite').showModal();
+}
+function aplicarNicho(){ const n = NICHOS[$('s-nicho').value]; $('s-slogan').value = n.slogan; $('s-srv').value = n.srv.join('\n'); }
+$('s-nicho').onchange = aplicarNicho;
+function siteAtual(){
+  const p = alvoSite;
+  return gerarSite({empresa:p.empresa, cidade:p.cidade, tel:p.tel, insta:p.insta, k:$('s-nicho').value, slogan:$('s-slogan').value.trim(),
+    servicos:$('s-srv').value.split('\n').map(x => x.trim()).filter(Boolean)});
+}
+$('s-ver').onclick = () => {
+  const u = URL.createObjectURL(new Blob([siteAtual()], {type:'text/html'}));
+  window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000);
+};
+$('s-baixar').onclick = () => {
+  const nome = alvoSite.empresa.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([siteAtual()], {type:'text/html'})); a.download = 'site-'+nome+'.html'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+$('s-fechar').onclick = () => $('dsite').close();
+
+/* ===== INÍCIO ===== */
+desenharMedidor();
+desenharLembretes();
+iniciarNuvem();
+</script>
+</body>
+</html>
